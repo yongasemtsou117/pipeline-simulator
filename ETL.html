@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Advanced Data Pipeline + Warehouse Analytics | ETL to Insights</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0a1a2e 0%, #0c2a3b 100%);
+            font-family: 'Segoe UI', 'Poppins', 'Inter', monospace;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .dashboard {
+            max-width: 1600px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+
+        /* pipeline section */
+        .pipeline-container {
+            background: rgba(10, 25, 35, 0.7);
+            backdrop-filter: blur(4px);
+            border-radius: 2rem;
+            padding: 1.2rem;
+            border: 1px solid #2dd4bf30;
+        }
+
+        .stages {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .stage-card {
+            background: #0f212e;
+            border-radius: 1.5rem;
+            border-top: 3px solid #2dd4bf;
+            overflow: hidden;
+        }
+
+        .stage-header {
+            background: #1a3442;
+            padding: 0.7rem;
+            text-align: center;
+            font-weight: bold;
+            font-size: 1rem;
+            color: #cffafe;
+        }
+
+        .stage-content {
+            padding: 0.8rem;
+            min-height: 180px;
+        }
+
+        .queue-visual {
+            background: #07161f;
+            border-radius: 1rem;
+            padding: 0.5rem;
+            min-height: 110px;
+            max-height: 130px;
+            overflow-y: auto;
+        }
+
+        .data-items {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+
+        .data-record {
+            background: #2b4b5e;
+            padding: 3px 7px;
+            border-radius: 20px;
+            font-size: 0.65rem;
+            font-family: monospace;
+            color: #e0f2fe;
+        }
+
+        .failed-record {
+            background: #8b3a3a;
+            border-left: 3px solid #ff6b6b;
+        }
+
+        .metrics {
+            font-size: 0.7rem;
+            background: #00000055;
+            border-radius: 1rem;
+            padding: 5px;
+            margin-top: 6px;
+            text-align: center;
+        }
+
+        .control-bar {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 0.7rem;
+            background: #07161fcc;
+            padding: 0.8rem;
+            border-radius: 2rem;
+            margin-top: 0.5rem;
+        }
+
+        button {
+            background: #1e4b5e;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 2rem;
+            font-weight: bold;
+            font-family: inherit;
+            color: white;
+            cursor: pointer;
+            transition: 0.1s;
+        }
+        button:active { transform: scale(0.96); }
+        .btn-primary { background: #0f7b6e; }
+        .btn-warning { background: #c97e2c; }
+        .btn-danger { background: #a03e2c; }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #0e2d38;
+            padding: 3px 12px;
+            border-radius: 2rem;
+            font-size: 0.8rem;
+        }
+        input[type="range"] { width: 110px; }
+
+        .stats-panel {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            gap: 8px;
+            background: #05222e;
+            border-radius: 1.5rem;
+            padding: 0.6rem 1rem;
+            font-family: monospace;
+            font-weight: bold;
+            font-size: 0.8rem;
+        }
+        .stat { background: #00000044; padding: 3px 10px; border-radius: 2rem; }
+
+        /* ---------- WAREHOUSE VIZ (NEW) ---------- */
+        .warehouse-section {
+            background: linear-gradient(145deg, #0b2b2f, #052025);
+            border-radius: 2rem;
+            padding: 1.2rem;
+            border: 1px solid #3b9b8e;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+        }
+        .warehouse-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            flex-wrap: wrap;
+            margin-bottom: 1rem;
+            border-bottom: 2px dashed #2dd4bf;
+            padding-bottom: 0.5rem;
+        }
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .kpi-card {
+            background: #0a1f28;
+            border-radius: 1.2rem;
+            padding: 0.6rem;
+            text-align: center;
+            border-left: 4px solid #2dd4bf;
+        }
+        .kpi-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #7ae9e0;
+            font-family: monospace;
+        }
+        .viz-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-top: 0.8rem;
+        }
+        .chart-box {
+            flex: 1;
+            min-width: 200px;
+            background: #07161faa;
+            border-radius: 1.2rem;
+            padding: 0.6rem;
+        }
+        canvas { max-height: 200px; width: 100%; }
+        .user-activity-list {
+            background: #07161f;
+            border-radius: 1rem;
+            padding: 0.5rem;
+            max-height: 180px;
+            overflow-y: auto;
+            font-size: 0.7rem;
+        }
+        .user-row {
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px solid #2c5f6e;
+            padding: 4px;
+            font-family: monospace;
+        }
+        footer { text-align: center; font-size: 0.7rem; margin-top: 1rem; color: #5ba1b3; }
+        .badge { background: #2dd4bf33; border-radius: 20px; padding: 2px 8px; font-size: 0.7rem; }
+    </style>
+</head>
+<body>
+<div class="dashboard">
+    <!-- PIPELINE SIMULATOR SECTION -->
+    <div class="pipeline-container">
+        <h2 style="color:#cffafe; margin:0 0 10px 0;">⚙️ ETL PIPELINE <span style="font-size:0.7rem;">| Extract → Transform → Load → Warehouse</span></h2>
+        <div class="stages">
+            <div class="stage-card"><div class="stage-header">📀 EXTRACT</div><div class="stage-content"><div class="queue-visual"><div class="data-items" id="extractQueue"></div></div><div class="metrics">📦 <span id="extractCount">0</span> / <span id="extractLimit">100</span><br>⚡ rate: <span id="extractRateLabel">2.5</span>/s</div></div></div>
+            <div class="stage-card"><div class="stage-header">🔄 TRANSFORM <span class="badge" id="workerCountBadge">3w</span></div><div class="stage-content"><div class="queue-visual"><div class="data-items" id="transformQueue"></div></div><div class="metrics">📦 <span id="transformCount">0</span> | ⏱️ <span id="procTimeLabel">180</span>ms</div></div></div>
+            <div class="stage-card"><div class="stage-header">💾 LOAD</div><div class="stage-content"><div class="queue-visual"><div class="data-items" id="loadQueue"></div></div><div class="metrics">✅ loaded: <span id="loadCount">0</span><br>📈 <span id="throughputSpan">0</span>/min</div></div></div>
+            <div class="stage-card"><div class="stage-header">⚠️ DEAD LETTER</div><div class="stage-content"><div class="queue-visual"><div class="data-items" id="dlqQueue"></div></div><div class="metrics">💀 <span id="dlqCount">0</span> &nbsp; <button id="retryDlqBtn" style="background:#5a4a2a; padding:2px 6px;">↻ Retry</button></div></div></div>
+        </div>
+        <div class="control-bar">
+            <button id="generateBtn" class="btn-primary">➕ Inject</button>
+            <button id="autoGenBtn">⏯️ Auto</button>
+            <button id="flushBtn">🧹 Flush Queues</button>
+            <button id="backpressureBtn" class="btn-warning">⚠️ Backpressure</button>
+            <div class="slider-container">⚡ Rate <input type="range" id="rateSlider" min="0.5" max="12" step="0.2" value="2.5"><span id="rateValue">2.5</span></div>
+            <div class="slider-container">⏱️ Latency <input type="range" id="delaySlider" min="50" max="700" step="10" value="180"><span id="delayValue">180</span>ms</div>
+            <div class="slider-container">👷 Workers <input type="range" id="workerSlider" min="1" max="8" step="1" value="3"><span id="workerValue">3</span></div>
+            <div class="slider-container">📦 Limit <input type="range" id="queueLimitSlider" min="20" max="200" step="10" value="100"><span id="limitValue">100</span></div>
+        </div>
+        <div class="stats-panel">
+            <div class="stat">📊 Throughput (1min): <span id="throughputStat">0</span></div>
+            <div class="stat">📈 Total loaded: <span id="totalProcessedSpan">0</span></div>
+            <div class="stat">💀 Failed: <span id="totalFailedSpan">0</span></div>
+            <div class="stat">🔥 Backpressure: <span id="backpressureFlag">❌ NO</span></div>
+            <div class="stat">📉 Dropped: <span id="droppedSpan">0</span></div>
+        </div>
+    </div>
+
+    <!-- NEW: DATA WAREHOUSE VISUALIZATION LAYER (after load) -->
+    <div class="warehouse-section">
+        <div class="warehouse-header">
+            <h2 style="margin:0; color:#7ae9e0;">🏢 DATA WAREHOUSE & USER INSIGHTS</h2>
+            <span style="font-size:0.7rem; background:#00000066; padding:4px 12px; border-radius:30px;">✅ Live from pipeline load events</span>
+        </div>
+        <!-- KPI CARDS derived from warehouse -->
+        <div class="kpi-grid">
+            <div class="kpi-card"><div style="font-size:0.7rem;">👥 Active Users (last 5min)</div><div class="kpi-value" id="kpiActiveUsers">0</div></div>
+            <div class="kpi-card"><div style="font-size:0.7rem;">💰 Total Purchase Volume</div><div class="kpi-value" id="kpiRevenue">$0</div></div>
+            <div class="kpi-card"><div style="font-size:0.7rem;">📦 Avg. Event / User</div><div class="kpi-value" id="kpiAvgEvents">0</div></div>
+            <div class="kpi-card"><div style="font-size:0.7rem;">⚡ Pipeline Freshness</div><div class="kpi-value" id="kpiFreshness">0s</div></div>
+        </div>
+
+        <div class="viz-row">
+            <div class="chart-box"><canvas id="userEventChart" width="400" height="180"></canvas><div style="text-align:center; font-size:0.65rem;">📊 Events by user (top 5)</div></div>
+            <div class="chart-box"><canvas id="eventTypeChart" width="400" height="180"></canvas><div style="text-align:center; font-size:0.65rem;">🎯 Event Type Distribution</div></div>
+            <div class="chart-box"><div style="font-weight:bold;">👤 Recent User Activity</div><div class="user-activity-list" id="userActivityList">Waiting for data...</div></div>
+        </div>
+        <div style="margin-top: 10px; font-size:0.7rem; color:#9bc9d4; text-align:center;">💡 Each loaded record enriches warehouse: user profiles, revenue, event counters.</div>
+    </div>
+    <footer>🔁 Real-time warehouse aggregation | Parallel workers | DLQ & auto-retry | Full analytics after LOAD stage</footer>
+</div>
+
+<script>
+    // ======================== PIPELINE CORE ========================
+    let nextId = 1000;
+    let extractQueue = [];      // raw
+    let transformQueue = [];     // transformed ready to load
+    let loadedHistory = [];      // last loaded records (for UI)
+    let deadLetterQueue = [];
+
+    let autoEnabled = false;
+    let extractRate = 2.5;
+    let transformLatency = 180;
+    let workerCount = 3;
+    let maxQueueSize = 100;
+    let backpressure = false;
+    let droppedRecords = 0;
+    let totalLoaded = 0;
+    let totalFailed = 0;
+    let throughputTimestamps = [];
+
+    // ---------- WAREHOUSE DATA MODEL (denormalized fact & dims) ----------
+    let warehouse = {
+        users: new Map(),   // userId -> { userId, username, totalEvents, lastSeen, purchaseTotal, eventTypeCounts }
+        globalStats: { totalEvents: 0, totalPurchaseAmount: 0, startTime: Date.now() }
+    };
+
+    // Helper: extract user id from rawValue (e.g., "user_123_purchase" or "user_login_42")
+    function extractUserId(rawValue) {
+        let match = rawValue.match(/(?:user_|user)(\d+)/i);
+        if(match) return `user_${match[1]}`;
+        let randomFallback = `anon_${Math.floor(Math.random() * 200)}`;
+        return randomFallback;
+    }
+
+    // determine event type & potential monetary value
+    function analyzeEvent(rawValue, transformed) {
+        let lower = rawValue.toLowerCase();
+        let eventType = 'other';
+        let monetary = 0;
+        if(lower.includes('purchase')) { eventType = 'purchase'; monetary = Math.floor(Math.random() * 150) + 10; }
+        else if(lower.includes('login') || lower.includes('signup')) eventType = 'authentication';
+        else if(lower.includes('click')) eventType = 'click';
+        else if(lower.includes('api')) eventType = 'api_call';
+        else if(lower.includes('event')) eventType = 'generic';
+        return { eventType, monetary };
+    }
+
+    // update warehouse with a loaded record (after LOAD stage)
+    function ingestToWarehouse(record) {
+        const userId = extractUserId(record.rawValue);
+        const { eventType, monetary } = analyzeEvent(record.rawValue, record.transformed);
+        const now = Date.now();
+
+        if(!warehouse.users.has(userId)) {
+            warehouse.users.set(userId, {
+                userId: userId,
+                username: `@${userId.substring(0,12)}`,
+                totalEvents: 0,
+                lastSeen: now,
+                purchaseTotal: 0,
+                eventTypeCounts: { authentication:0, purchase:0, click:0, api_call:0, generic:0, other:0 }
+            });
+        }
+        const user = warehouse.users.get(userId);
+        user.totalEvents++;
+        user.lastSeen = now;
+        if(eventType === 'purchase') user.purchaseTotal += monetary;
+        user.eventTypeCounts[eventType] = (user.eventTypeCounts[eventType] || 0) + 1;
+        
+        // global stats
+        warehouse.globalStats.totalEvents++;
+        if(eventType === 'purchase') warehouse.globalStats.totalPurchaseAmount += monetary;
+        
+        // keep record in loadedHistory for UI
+        record.userId = userId;
+        record.eventType = eventType;
+        record.monetary = monetary;
+    }
+
+    // -------- existing pipeline functions ----------
+    function updateUIQueues() {
+        const extractDiv = document.getElementById('extractQueue');
+        extractDiv.innerHTML = extractQueue.slice(0, 15).map(r => `<div class="data-record">#${r.id} 📁 ${r.rawValue}</div>`).join('');
+        document.getElementById('transformQueue').innerHTML = transformQueue.slice(0, 15).map(r => `<div class="data-record">#${r.id} ✨ ${r.transformed?.substring(0,20)}</div>`).join('');
+        document.getElementById('loadQueue').innerHTML = loadedHistory.slice(-10).reverse().map(r => `<div class="data-record">#${r.id} 💾 ${r.transformed?.substring(0,12)}</div>`).join('');
+        document.getElementById('dlqQueue').innerHTML = deadLetterQueue.slice(0, 12).map(r => `<div class="data-record failed-record">❌ ${r.rawValue.substring(0,12)}</div>`).join('');
+        document.getElementById('extractCount').innerText = extractQueue.length;
+        document.getElementById('transformCount').innerText = transformQueue.length;
+        document.getElementById('loadCount').innerText = loadedHistory.length;
+        document.getElementById('dlqCount').innerText = deadLetterQueue.length;
+        document.getElementById('extractLimit').innerText = maxQueueSize;
+        document.getElementById('droppedSpan').innerText = droppedRecords;
+        document.getElementById('totalProcessedSpan').innerText = totalLoaded;
+        document.getElementById('totalFailedSpan').innerText = totalFailed;
+        const throughputPerMin = throughputTimestamps.filter(t => (Date.now()/1000 - t) <= 60).length;
+        document.getElementById('throughputStat').innerText = throughputPerMin;
+        document.getElementById('throughputSpan').innerText = throughputPerMin;
+    }
+
+    function recordLoadSuccess() {
+        throughputTimestamps.push(Date.now() / 1000);
+        throughputTimestamps = throughputTimestamps.filter(t => (Date.now()/1000 - t) <= 60);
+        updateUIQueues();
+    }
+
+    function loadRecord(record) {
+        // 1. Ingest into warehouse (THE VISUALIZATION after data warehouse)
+        ingestToWarehouse(record);
+        loadedHistory.push(record);
+        if(loadedHistory.length > 40) loadedHistory.shift();
+        totalLoaded++;
+        recordLoadSuccess();
+        updateUIQueues();
+        updateWarehouseVisuals();   // refresh charts & KPIs
+    }
+
+    async function transformRecord(record) {
+        return new Promise((resolve) => {
+            setTimeout(() => {
+                const willFail = Math.random() < 0.09; // 9% fail rate
+                if(willFail) {
+                    record.errorReason = `schema error at ${new Date().toLocaleTimeString()}`;
+                    resolve({ success: false, record });
+                } else {
+                    record.transformed = `📊${record.rawValue.toUpperCase()}_READY`;
+                    resolve({ success: true, record });
+                }
+            }, transformLatency);
+        });
+    }
+
+    async function workerProcess() {
+        if(extractQueue.length === 0) return;
+        if(backpressure && Math.random() < 0.5) { setTimeout(() => workerProcess(), 90); return; }
+        const record = extractQueue.shift();
+        updateUIQueues();
+        const result = await transformRecord(record);
+        if(result.success) transformQueue.push(result.record);
+        else { deadLetterQueue.push(result.record); totalFailed++; }
+        updateUIQueues();
+        scheduleLoader();
+    }
+    
+    let loaderBusy = false;
+    function scheduleLoader() {
+        if(loaderBusy) return;
+        loaderBusy = true;
+        setTimeout(() => {
+            if(transformQueue.length > 0) {
+                const ready = transformQueue.shift();
+                loadRecord(ready);
+            }
+            loaderBusy = false;
+            if(transformQueue.length > 0) scheduleLoader();
+        }, 20);
+    }
+
+    let workerInterval;
+    function startWorkers() { if(workerInterval) clearInterval(workerInterval); workerInterval = setInterval(() => { const active = Math.min(workerCount, extractQueue.length); for(let i=0;i<active;i++) workerProcess(); }, 35); }
+    function generateRecord() {
+        if(extractQueue.length >= maxQueueSize) { droppedRecords++; updateUIQueues(); return; }
+        const id = nextId++;
+        const userNum = Math.floor(Math.random() * 45) + 1;
+        const action = ['purchase', 'login', 'click', 'api_call', 'event'][Math.floor(Math.random()*5)];
+        const rawValue = `user_${userNum}_${action}_${Math.floor(Math.random()*999)}`;
+        extractQueue.push({ id, rawValue, transformed: null, createdAt: Date.now() });
+        updateUIQueues();
+    }
+
+    // auto generator
+    let lastGen = 0, animFrame = null;
+    function autoLoop(ts) { if(!autoEnabled) return; if(!lastGen) lastGen=ts; const interval=(1/extractRate)*1000; if(ts-lastGen>=interval){ generateRecord(); lastGen=ts; } animFrame=requestAnimationFrame(autoLoop); }
+    function toggleAuto() { if(autoEnabled) { autoEnabled=false; if(animFrame) cancelAnimationFrame(animFrame); document.getElementById('autoGenBtn').innerHTML='▶️ Auto'; } else { autoEnabled=true; lastGen=0; animFrame=requestAnimationFrame(autoLoop); document.getElementById('autoGenBtn').innerHTML='⏸️ Pause'; } }
+    function flushAll() { extractQueue=[]; transformQueue=[]; updateUIQueues(); }
+    function retryDlq() { const failed=[...deadLetterQueue]; deadLetterQueue=[]; failed.forEach(f=>{ delete f.errorReason; f.transformed=null; extractQueue.push(f); }); updateUIQueues(); }
+    function simBackpressure() { if(backpressure) return; backpressure=true; document.getElementById('backpressureFlag').innerHTML='⚠️ ACTIVE'; setTimeout(()=>{ backpressure=false; document.getElementById('backpressureFlag').innerHTML='❌ NO'; }, 5000); }
+
+    // ========== WAREHOUSE VISUALIZATION: charts + KPI ==========
+    let userChart, eventChart;
+    function initWarehouseCharts() {
+        const ctx1 = document.getElementById('userEventChart').getContext('2d');
+        const ctx2 = document.getElementById('eventTypeChart').getContext('2d');
+        userChart = new Chart(ctx1, { type: 'bar', data: { labels: [], datasets: [{ label: 'Events', data: [], backgroundColor: '#4cafaa' }] }, options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { labels: { color: '#cffafe' } } } } });
+        eventChart = new Chart(ctx2, { type: 'doughnut', data: { labels: [], datasets: [{ data: [], backgroundColor: ['#ffb347','#4cafaa','#e0825e','#7aa2f7','#c586c0'] }] }, options: { responsive: true, plugins: { legend: { labels: { color: '#cffafe' } } } } });
+    }
+
+    function updateWarehouseVisuals() {
+        // 1. KPIs
+        const nowSec = Date.now() / 1000;
+        let activeUsersCount = 0;
+        let totalPurchaseAmount = warehouse.globalStats.totalPurchaseAmount;
+        let totalEventsGlobal = warehouse.globalStats.totalEvents;
+        for(let user of warehouse.users.values()) { if((nowSec - user.lastSeen/1000) < 300) activeUsersCount++; }
+        document.getElementById('kpiActiveUsers').innerText = activeUsersCount;
+        document.getElementById('kpiRevenue').innerText = `$${totalPurchaseAmount.toFixed(0)}`;
+        const avgEvents = warehouse.users.size ? (totalEventsGlobal / warehouse.users.size).toFixed(1) : 0;
+        document.getElementById('kpiAvgEvents').innerText = avgEvents;
+        const lastLoad = loadedHistory.length ? (Date.now() - (loadedHistory[loadedHistory.length-1]?.createdAt || Date.now()))/1000 : 0;
+        document.getElementById('kpiFreshness').innerText = `${Math.floor(lastLoad)}s`;
+        
+        // 2. top 5 users by events
+        let userEventArray = Array.from(warehouse.users.values()).map(u => ({ name: u.userId.substring(0,10), events: u.totalEvents }));
+        userEventArray.sort((a,b)=>b.events-a.events);
+        const top5 = userEventArray.slice(0,5);
+        if(userChart) { userChart.data.labels = top5.map(u=>u.name); userChart.data.datasets[0].data = top5.map(u=>u.events); userChart.update(); }
+        
+        // 3. event type distribution (global)
+        let typeCounts = { authentication:0, purchase:0, click:0, api_call:0, generic:0, other:0 };
+        for(let user of warehouse.users.values()) { for(let [type,cnt] of Object.entries(user.eventTypeCounts)) { if(typeCounts[type]!==undefined) typeCounts[type]+=cnt; else typeCounts.other+=cnt; } }
+        const eventLabels = Object.keys(typeCounts).filter(k=>typeCounts[k]>0);
+        const eventData = eventLabels.map(k=>typeCounts[k]);
+        if(eventChart) { eventChart.data.labels = eventLabels; eventChart.data.datasets[0].data = eventData; eventChart.update(); }
+        
+        // 4. recent user activity list (last 5 loaded records)
+        const recentActivity = loadedHistory.slice(-6).reverse().map(rec => `<div class="user-row"><span>🧑 ${rec.userId || '?'}</span><span>${rec.eventType || 'event'} ${rec.monetary ? `$${rec.monetary}` : ''}</span><span>⚡${rec.transformed?.slice(0,8)}</span></div>`).join('');
+        document.getElementById('userActivityList').innerHTML = recentActivity || `<div class="user-row">No warehouse data yet... send events</div>`;
+    }
+
+    // bind controls
+    function bindControls() {
+        document.getElementById('rateSlider').addEventListener('input', e=>{ extractRate=parseFloat(e.target.value); document.getElementById('rateValue').innerText=extractRate; document.getElementById('extractRateLabel').innerText=extractRate; });
+        document.getElementById('delaySlider').addEventListener('input', e=>{ transformLatency=parseInt(e.target.value); document.getElementById('delayValue').innerText=transformLatency; document.getElementById('procTimeLabel').innerText=transformLatency; });
+        document.getElementById('workerSlider').addEventListener('input', e=>{ workerCount=parseInt(e.target.value); document.getElementById('workerValue').innerText=workerCount; document.getElementById('workerCountBadge').innerText=workerCount+'w'; startWorkers(); });
+        document.getElementById('queueLimitSlider').addEventListener('input', e=>{ maxQueueSize=parseInt(e.target.value); document.getElementById('limitValue').innerText=maxQueueSize; updateUIQueues(); });
+        document.getElementById('generateBtn').onclick = () => generateRecord();
+        document.getElementById('autoGenBtn').onclick = toggleAuto;
+        document.getElementById('flushBtn').onclick = flushAll;
+        document.getElementById('backpressureBtn').onclick = simBackpressure;
+        document.getElementById('retryDlqBtn').onclick = retryDlq;
+    }
+
+    function seedInitial() { for(let i=0;i<6;i++) generateRecord(); }
+    function init() { bindControls(); startWorkers(); initWarehouseCharts(); seedInitial(); setInterval(()=>{ updateUIQueues(); updateWarehouseVisuals(); }, 500); }
+    init();
+</script>
+</body>
+</html>
